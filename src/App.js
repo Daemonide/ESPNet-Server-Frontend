@@ -1,18 +1,22 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  Box, CssBaseline, AppBar, Toolbar, Typography, Drawer, List, ListItem,
-  ListItemButton, ListItemIcon, ListItemText, Grid, Card,
-  CardContent, IconButton, Button, Select, MenuItem, FormControl, InputLabel,
-  ThemeProvider, createTheme, Chip, Tooltip, Fade, Divider, SvgIcon
+  Box, CssBaseline, AppBar, Toolbar, Typography, Drawer, List,
+  ThemeProvider, createTheme,
+  Button, FormControl, InputLabel, Select, MenuItem,
+  Dialog, DialogContent, DialogActions, Alert, Snackbar,
+  Chip, Avatar, ListItemButton, ListItemIcon, ListItemText, SvgIcon
 } from '@mui/material';
-
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import TuneIcon from '@mui/icons-material/Tune';
-import CloseIcon from '@mui/icons-material/Close';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CelebrationIcon from '@mui/icons-material/Celebration';
+import MilitaryTechIcon from '@mui/icons-material/MilitaryTech';
+import WifiIcon from '@mui/icons-material/Wifi';
+import WifiOffIcon from '@mui/icons-material/WifiOff';
+import PeopleIcon from '@mui/icons-material/People';
+import Dashboard from './Dashboard';
+import LaserTag from './LaserTag';
 
-// --- CUSTOM SVG ICON COMPONENT ---
 const ESPNetLogo = (props) => (
   <SvgIcon {...props} viewBox="0 0 1960.69 1960.69">
     <g id="Layer_1" data-name="Layer 1">
@@ -82,134 +86,607 @@ const ESPNetLogo = (props) => (
   </SvgIcon>
 );
 
-const NATO = { A: "Alpha", B: "Bravo", C: "Charlie", D: "Delta", E: "Echo", F: "Foxtrot", G: "Golf", H: "Hotel", I: "India", J: "Juliet", K: "Kilo", L: "Lima", M: "Mike", N: "November", O: "Oscar", P: "Papa", Q: "Quebec", R: "Romeo", S: "Sierra", T: "Tango", U: "Uniform", V: "Victor", W: "Whiskey", X: "X-ray", Y: "Yankee", Z: "Zulu" };
-const drawerWidth = 260;
+const NATO = {
+  A: "Alpha", B: "Bravo", C: "Charlie", D: "Delta", E: "Echo",
+  F: "Foxtrot", G: "Golf", H: "Hotel", I: "India", J: "Juliett",
+  K: "Kilo", L: "Lima", M: "Mike", N: "November", O: "Oscar",
+  P: "Papa", Q: "Quebec", R: "Romeo", S: "Sierra", T: "Tango",
+  U: "Uniform", V: "Victor", W: "Whiskey", X: "X-ray", Y: "Yankee", Z: "Zulu"
+};
+
+const leftDrawerWidth = 220;
+const rightDrawerWidth = 360;
 
 const darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: { main: '#00d2ff' },
-    background: { default: '#050608', paper: '#0d0f14' }
+    secondary: { main: '#ff4b2b' },
+    success: { main: '#00ff88' },
+    warning: { main: '#ffcc00' },
+    error: { main: '#ff4b2b' },
+    background: { default: '#0a0c12', paper: '#0d0f14' },
   },
-  typography: { fontFamily: 'Inter, sans-serif' },
+  typography: {
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    h6: { fontWeight: 800 },
+  },
+  shape: { borderRadius: 12 },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: { textTransform: 'none', fontWeight: 700, borderRadius: 8 },
+      },
+    },
+  },
 });
 
 export default function App() {
-  const [devices, setDevices] = useState([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
+  const [victoryDialog, setVictoryDialog] = useState(false);
+  const [victoryMessage, setVictoryMessage] = useState('');
+  const [victoryTeam, setVictoryTeam] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
+  const [data, setData] = useState({
+    devices: [],
+    game: { teams: {}, tagged_out: {}, winners: null }
+  });
   const ws = useRef(null);
+
+  const showSnackbar = (message, severity = 'info') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   useEffect(() => {
     const connect = () => {
-      ws.current = new WebSocket(`ws://${window.location.hostname}:3000/ws`);
-      ws.current.onmessage = (e) => setDevices(JSON.parse(e.data));
-      ws.current.onclose = () => setTimeout(connect, 2000);
+      const wsUrl = `ws://localhost:8080/ws`;
+      ws.current = new WebSocket(wsUrl);
+
+      ws.current.onopen = () => {
+        setConnectionStatus('connected');
+        showSnackbar('Connected to server', 'success');
+      };
+
+      ws.current.onmessage = (e) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          if (parsed.type === 'victory') {
+            setVictoryTeam(parsed.winner);
+            setVictoryMessage(parsed.message);
+            setVictoryDialog(true);
+            showSnackbar(`${parsed.winner.toUpperCase()} WINS!`, 'success');
+          } else {
+            const formattedData = {
+              devices: Array.isArray(parsed.devices) ? parsed.devices : [],
+              game: parsed.game || { teams: {}, tagged_out: {}, winners: null }
+            };
+            setData(formattedData);
+          }
+        } catch (err) {
+          console.error("Failed to parse WebSocket data:", err);
+        }
+      };
+
+      ws.current.onclose = () => {
+        setConnectionStatus('disconnected');
+        showSnackbar('Disconnected. Reconnecting...', 'warning');
+        setTimeout(connect, 2000);
+      };
+
+      ws.current.onerror = () => {
+        setConnectionStatus('error');
+      };
     };
+
     connect();
     const interval = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
-    return () => clearInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+      if (ws.current) ws.current.close();
+    };
   }, []);
 
-  const getStatus = (dev) => {
-    const diff = Math.max(0, now - dev.last_seen);
-    const online = dev.is_online && diff < 20;
-    return { diff, isLate: diff >= 8 && online, isOffline: !online };
+  const callApi = async (endpoint, method = 'GET', body = null) => {
+    try {
+      const options = {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+      };
+      if (body) options.body = JSON.stringify(body);
+
+      const response = await fetch(`http://localhost:8080${endpoint}`, options);
+      
+      if (!response.ok) {
+        const text = await response.text();
+        console.error(`API Error ${response.status}:`, text);
+        showSnackbar(`Error: ${response.statusText}`, 'error');
+        return null;
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      }
+      
+      return { success: true };
+    } catch (err) {
+      console.error(`API Error for ${endpoint}:`, err);
+      showSnackbar(`Failed to ${method} ${endpoint}`, 'error');
+      return null;
+    }
   };
+
+  const deleteDevice = async (mac) => {
+    await callApi(`/api/device/${mac}`, 'DELETE');
+  };
+
+  const assignCallsign = async (mac, callsign) => {
+    await callApi(`/api/assign/${mac}/${callsign}`, 'POST');
+  };
+
+  const setTeam = async (mac, team) => {
+    await callApi(`/api/team/${mac}/${team}`, 'PUT');
+  };
+
+  const toggleTag = async (mac) => {
+    await callApi(`/api/toggle_tag/${mac}`, 'POST');
+  };
+
+  const resetGame = async () => {
+    await callApi('/api/reset_game', 'POST');
+  };
+
+  const resetTags = async () => {
+    await callApi('/api/reset_tags', 'POST');
+  };
+
+  const allDevices = data.devices;
+  const onlineCount = data.devices.filter(d => {
+    const diff = Math.max(0, now - d.last_seen);
+    return d.is_online || diff < 15;
+  }).length;
 
   return (
     <ThemeProvider theme={darkTheme}>
-      <Box sx={{ display: 'flex' }}>
-        <CssBaseline />
-        <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 2, bgcolor: 'rgba(13,15,20,0.8)', backdropFilter: 'blur(10px)' }}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+        
+        {/* Full-Width Top Bar */}
+        <AppBar 
+          position="fixed" 
+          elevation={0} 
+          sx={{ 
+            zIndex: 1301, 
+            background: 'linear-gradient(135deg, rgba(13,15,20,0.95) 0%, rgba(20,25,35,0.9) 100%)',
+            backdropFilter: 'blur(20px)',
+            borderBottom: '1px solid rgba(255,255,255,0.1)'
+          }}
+        >
           <Toolbar>
-            {/* --- UPDATED SIZE HERE --- */}
             <ESPNetLogo sx={{ mr: 2, color: 'primary.main', fontSize: 70 }} />
-            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 800 }}>ESPNet Hub</Typography>
-            <Button variant="contained" startIcon={<TuneIcon />} onClick={() => setSidebarOpen(true)}>Registry</Button>
+            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 900, letterSpacing: 0.5 }}>
+              ESPNet Control Panel
+            </Typography>
+            
+            {/* Registry Button with Icon and Text */}
+            <Button
+              variant="outlined"
+              startIcon={<PeopleIcon />}
+              onClick={() => setRightDrawerOpen(!rightDrawerOpen)}
+              sx={{
+                mr: 2,
+                px: 2.5,
+                py: 1,
+                borderWidth: 2,
+                borderColor: rightDrawerOpen ? '#00d2ff' : 'rgba(255,255,255,0.2)',
+                color: rightDrawerOpen ? '#00d2ff' : 'rgba(255,255,255,0.7)',
+                fontWeight: 800,
+                fontSize: '0.85rem',
+                bgcolor: rightDrawerOpen ? 'rgba(0,210,255,0.1)' : 'transparent',
+                '&:hover': {
+                  borderWidth: 2,
+                  borderColor: '#00d2ff',
+                  bgcolor: 'rgba(0,210,255,0.15)',
+                  color: '#00d2ff'
+                }
+              }}
+            >
+              Registry
+            </Button>
+
+            {/* Connection Status */}
+            <Chip 
+              icon={connectionStatus === 'connected' ? <WifiIcon /> : <WifiOffIcon />}
+              label={connectionStatus === 'connected' ? 'Connected' : 'Offline'}
+              size="small"
+              sx={{ 
+                height: 34,
+                px: 1,
+                bgcolor: connectionStatus === 'connected' ? 'rgba(0,255,136,0.15)' : 'rgba(255,75,43,0.15)',
+                color: connectionStatus === 'connected' ? '#00ff88' : '#ff4b2b',
+                border: `2px solid ${connectionStatus === 'connected' ? 'rgba(0,255,136,0.4)' : 'rgba(255,75,43,0.4)'}`,
+                fontWeight: 800,
+                fontSize: '0.75rem'
+              }}
+            />
           </Toolbar>
         </AppBar>
 
-        <Drawer variant="permanent" sx={{ width: drawerWidth, flexShrink: 0, [`& .MuiDrawer-paper`]: { width: drawerWidth } }}>
+        {/* Left Sidebar - Navigation */}
+        <Drawer
+          variant="permanent"
+          sx={{
+            width: leftDrawerWidth,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: leftDrawerWidth,
+              boxSizing: 'border-box',
+              background: 'linear-gradient(180deg, rgba(13,15,20,0.98) 0%, rgba(10,12,18,0.95) 100%)',
+              borderRight: '1px solid rgba(255,255,255,0.08)',
+              backdropFilter: 'blur(20px)'
+            },
+          }}
+        >
           <Toolbar />
-          <List sx={{ mt: 2 }}>
-            <ListItem disablePadding>
-              <ListItemButton selected>
-                <ListItemIcon><DashboardIcon color="primary" /></ListItemIcon>
-                <ListItemText primary="Dashboard" />
+          
+          <Box sx={{ p: 2, pt: 3 }}>
+            <List sx={{ gap: 1, display: 'flex', flexDirection: 'column' }}>
+              <ListItemButton
+                selected={activeTab === 'dashboard'}
+                onClick={() => setActiveTab('dashboard')}
+                sx={{
+                  borderRadius: 2.5,
+                  py: 1.5,
+                  px: 2,
+                  mb: 1,
+                  '&.Mui-selected': {
+                    background: 'linear-gradient(135deg, #00d2ff 0%, #0099cc 100%)',
+                    color: '#000',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #00d2ff 0%, #0099cc 100%)',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: '#000'
+                    }
+                  },
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.05)'
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <DashboardIcon sx={{ fontSize: 22 }} />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Dashboard" 
+                  primaryTypographyProps={{ fontWeight: 800, fontSize: '0.9rem' }}
+                />
               </ListItemButton>
-            </ListItem>
-          </List>
+
+              <ListItemButton
+                selected={activeTab === 'lasertag'}
+                onClick={() => setActiveTab('lasertag')}
+                sx={{
+                  borderRadius: 2.5,
+                  py: 1.5,
+                  px: 2,
+                  '&.Mui-selected': {
+                    background: 'linear-gradient(135deg, #00d2ff 0%, #0099cc 100%)',
+                    color: '#000',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #00d2ff 0%, #0099cc 100%)',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: '#000'
+                    }
+                  },
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.05)'
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <SportsEsportsIcon sx={{ fontSize: 22 }} />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Laser Tag" 
+                  primaryTypographyProps={{ fontWeight: 800, fontSize: '0.9rem' }}
+                />
+              </ListItemButton>
+            </List>
+          </Box>
+
+          {/* Footer */}
+          <Box sx={{ mt: 'auto', p: 2.5, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <Typography variant="caption" sx={{ opacity: 0.4, display: 'block', textAlign: 'center', fontSize: '0.7rem' }}>
+              ESPNet Control Panel
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.3, display: 'block', textAlign: 'center', fontSize: '0.65rem', mt: 0.5 }}>
+              v3.0.0
+            </Typography>
+          </Box>
         </Drawer>
 
-        <Box component="main" sx={{ flexGrow: 1, p: 4 }}>
-          <Toolbar />
-          <Grid container spacing={3}>
-            {devices.map((dev) => {
-              const { diff, isLate, isOffline } = getStatus(dev);
-              return (
-                <Grid item xs={12} sm={6} md={4} key={dev.mac}>
-                  <Fade in={true}>
-                    <Card sx={{ borderRadius: 5, opacity: isOffline ? 0.4 : 1, filter: isOffline ? 'grayscale(1)' : 'none', border: '1px solid rgba(255,255,255,0.05)', '&:hover': { borderColor: 'primary.main', transform: 'translateY(-4px)' } }}>
-                      <CardContent sx={{ p: 3 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                          <Chip label={dev.identifier || "Unit"} size="small" color="primary" sx={{ fontWeight: 800 }} />
-                          <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: isOffline ? '#444' : (isLate ? '#ffcc00' : '#00ff88'), boxShadow: isOffline ? 'none' : `0 0 10px ${isLate ? '#ffcc00' : '#00ff88'}`, animation: isLate ? 'blink 1s infinite' : 'none' }} />
-                        </Box>
-                        <Typography variant="h5" sx={{ fontWeight: 800 }}>{dev.identifier ? NATO[dev.identifier] : dev.mac.slice(-5)}</Typography>
-                        <Typography variant="body2" color="primary" sx={{ fontFamily: 'monospace', mb: 2 }}>{dev.ip}</Typography>
-
-                        <Divider sx={{ my: 2, opacity: 0.1 }} />
-
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 3 }}>
-                          <Box sx={{ mr: 4 }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1 }}>Signal</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 700 }}>{diff}s ago</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', gap: 1.5 }}>
-                            <Tooltip title="Restart Hardware">
-                              <IconButton size="small" sx={{ bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} onClick={() => fetch(`http://${window.location.hostname}:3000/api/restart/${dev.mac}`, { method: 'POST' })}>
-                                <RestartAltIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Wipe WiFi">
-                              <IconButton size="small" color="error" sx={{ bgcolor: 'rgba(255,75,43,0.05)', border: '1px solid rgba(255,75,43,0.2)' }} onClick={() => fetch(`http://${window.location.hostname}:3000/api/reset_wifi/${dev.mac}`, { method: 'POST' })}>
-                                <DeleteForeverIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Fade>
-                </Grid>
-              );
-            })}
-          </Grid>
+        {/* Main Content - FIXED WIDTH CALCULATION */}
+        <Box 
+          component="main" 
+          sx={{ 
+            flexGrow: 1,
+            pt: 10, 
+            pb: 3,
+            px: 4,
+            overflowY: 'auto',
+            background: 'linear-gradient(180deg, #050608 0%, #0a0e15 100%)',
+            transition: 'all 0.3s ease-in-out'
+          }}
+        >
+          {activeTab === 'dashboard' && (
+            <Dashboard 
+              devices={data.devices} 
+              now={now} 
+              deleteDevice={deleteDevice} 
+              callApi={callApi}
+            />
+          )}
+          {activeTab === 'lasertag' && (
+            <LaserTag 
+              devices={data.devices} 
+              game={data.game}
+              toggleTag={toggleTag}
+              resetGame={resetGame}
+              resetTags={resetTags}
+              now={now}
+            />
+          )}
         </Box>
 
-        <Drawer anchor="right" open={sidebarOpen} onClose={() => setSidebarOpen(false)} sx={{ zIndex: (theme) => theme.zIndex.drawer + 3, '& .MuiDrawer-paper': { width: 380, p: 4 } }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}><Typography variant="h6" sx={{ fontWeight: 700 }}>Registry</Typography><IconButton onClick={() => setSidebarOpen(false)}><CloseIcon /></IconButton></Box>
-          <List>
-            {devices.map((dev) => (
-              <Box key={dev.mac} sx={{ mb: 3, p: 2, borderRadius: 3, bgcolor: 'background.default', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>{dev.mac}</Typography>
-                <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-                  <InputLabel>Assign ID</InputLabel>
-                  <Select value={dev.identifier || ""} label="Assign ID" onChange={(e) => fetch(`http://${window.location.hostname}:3000/api/assign/${dev.mac}/${e.target.value}`, { method: 'POST' })}>
-                    <MenuItem value="">None</MenuItem>
-                    {Object.entries(NATO).map(([k, v]) => (
-                      <MenuItem key={k} value={k} disabled={devices.some(d => d.identifier === k && d.mac !== dev.mac)}>{k} - {v}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-            ))}
-          </List>
-          <Button fullWidth variant="outlined" color="error" sx={{ mt: 'auto', fontWeight: 700 }} onClick={() => window.confirm("Purge Hub?") && fetch(`http://${window.location.hostname}:3000/api/clear_all`, { method: 'DELETE' })}>PURGE HUB</Button>
+                {/* Right Sidebar - Device Registry (OVERLAY) */}
+        <Drawer
+          variant="temporary"
+          anchor="right"
+          open={rightDrawerOpen}
+          onClose={() => setRightDrawerOpen(false)}
+          sx={{
+            width: rightDrawerWidth,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: rightDrawerWidth,
+              boxSizing: 'border-box',
+              background: 'linear-gradient(180deg, rgba(10,12,18,0.98) 0%, rgba(13,15,20,0.95) 100%)',
+              borderLeft: '1px solid rgba(255,255,255,0.08)',
+              backdropFilter: 'blur(30px)',
+            },
+          }}
+          ModalProps={{
+            keepMounted: true,
+          }}
+        >
+
+          <Toolbar />
+          
+          <Box sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>Device Registry</Typography>
+              <Chip 
+                label={`${onlineCount}/${allDevices.length}`} 
+                size="small" 
+                sx={{ 
+                  bgcolor: 'rgba(0,255,136,0.2)', 
+                  color: '#00ff88', 
+                  fontWeight: 900,
+                  border: '2px solid rgba(0,255,136,0.4)'
+                }} 
+              />
+            </Box>
+            <Typography variant="caption" sx={{ opacity: 0.6, display: 'block', mb: 3 }}>
+              All registered devices
+            </Typography>
+
+            <List sx={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', px: 0 }}>
+              {allDevices.map(dev => {
+                const diff = Math.max(0, now - dev.last_seen);
+                const isOnline = dev.is_online && diff < 15;
+                
+                return (
+                  <Box key={dev.mac} sx={{ mb: 2.5 }}>
+                    <Box sx={{ 
+                      p: 2.5, 
+                      borderRadius: 3, 
+                      bgcolor: isOnline ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.01)',
+                      border: dev.team === 'red' ? '2px solid rgba(255,75,43,0.5)' : dev.team === 'blue' ? '2px solid rgba(0,210,255,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                      opacity: isOnline ? 1 : 0.6,
+                      transition: 'all 0.3s',
+                      '&:hover': { 
+                        bgcolor: 'rgba(255,255,255,0.05)',
+                        opacity: 1,
+                        transform: 'translateY(-2px)',
+                        boxShadow: dev.team === 'red' ? '0 4px 20px rgba(255,75,43,0.3)' : dev.team === 'blue' ? '0 4px 20px rgba(0,210,255,0.3)' : '0 4px 20px rgba(0,0,0,0.2)'
+                      }
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <Avatar sx={{ 
+                          width: 40, 
+                          height: 40,
+                          bgcolor: dev.team === 'red' ? 'rgba(255,75,43,0.25)' : dev.team === 'blue' ? 'rgba(0,210,255,0.25)' : 'rgba(255,255,255,0.1)',
+                          border: `2.5px solid ${dev.team === 'red' ? '#ff4b2b' : dev.team === 'blue' ? '#00d2ff' : 'rgba(255,255,255,0.2)'}`
+                        }}>
+                          <MilitaryTechIcon sx={{ fontSize: 22, color: dev.team === 'red' ? '#ff4b2b' : dev.team === 'blue' ? '#00d2ff' : '#fff' }} />
+                        </Avatar>
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 900, fontSize: '0.95rem', mb: 0.3 }}>
+                            {dev.identifier ? NATO[dev.identifier] : 'UNASSIGNED'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ opacity: 0.6, fontSize: '0.7rem', fontFamily: 'monospace', display: 'block' }}>
+                            {dev.mac}
+                          </Typography>
+                        </Box>
+                        {!isOnline && (
+                          <Chip 
+                            label="OFFLINE" 
+                            size="small" 
+                            sx={{ 
+                              height: 22,
+                              fontSize: '0.65rem',
+                              fontWeight: 900,
+                              bgcolor: 'rgba(255,75,43,0.2)', 
+                              color: '#ff4b2b',
+                              border: '1px solid rgba(255,75,43,0.4)'
+                            }} 
+                          />
+                        )}
+                      </Box>
+
+                      <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                        <InputLabel sx={{ fontSize: '0.8rem', fontWeight: 700 }}>Callsign</InputLabel>
+                        <Select
+                          value={dev.identifier || ''}
+                          label="Callsign"
+                          onChange={(e) => assignCallsign(dev.mac, e.target.value)}
+                          sx={{ 
+                            fontSize: '0.85rem', 
+                            bgcolor: 'rgba(255,255,255,0.03)',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.1)'
+                            }
+                          }}
+                        >
+                          <MenuItem value=""><em>None</em></MenuItem>
+                          {Object.keys(NATO).map(letter => (
+                            <MenuItem key={letter} value={letter}>{letter} - {NATO[letter]}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                        <InputLabel sx={{ fontSize: '0.8rem', fontWeight: 700 }}>Team</InputLabel>
+                        <Select
+                          value={dev.team || 'none'}
+                          label="Team"
+                          onChange={(e) => setTeam(dev.mac, e.target.value)}
+                          sx={{ 
+                            fontSize: '0.85rem', 
+                            bgcolor: 'rgba(255,255,255,0.03)',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.1)'
+                            }
+                          }}
+                        >
+                          <MenuItem value="none">No Team</MenuItem>
+                          <MenuItem value="red">🔴 Red Team</MenuItem>
+                          <MenuItem value="blue">🔵 Blue Team</MenuItem>
+                        </Select>
+                      </FormControl>
+
+                      <Button 
+                        fullWidth
+                        size="small" 
+                        startIcon={<DeleteOutlineIcon />}
+                        onClick={() => deleteDevice(dev.mac)}
+                        sx={{ 
+                          color: '#ff4b2b',
+                          borderWidth: 2,
+                          borderColor: 'rgba(255,75,43,0.4)',
+                          fontWeight: 800,
+                          fontSize: '0.8rem',
+                          py: 1,
+                          '&:hover': { 
+                            bgcolor: 'rgba(255,75,43,0.15)', 
+                            borderWidth: 2,
+                            borderColor: '#ff4b2b' 
+                          }
+                        }}
+                        variant="outlined"
+                      >
+                        Remove Device
+                      </Button>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </List>
+          </Box>
         </Drawer>
+
+        {/* Victory Dialog - Fixed HTML Structure */}
+        <Dialog 
+          open={victoryDialog} 
+          onClose={() => setVictoryDialog(false)}
+          PaperProps={{
+            sx: {
+              borderRadius: 4,
+              background: 'linear-gradient(135deg, rgba(20,20,30,0.98) 0%, rgba(10,10,20,0.95) 100%)',
+              backdropFilter: 'blur(40px)',
+              border: `3px solid ${victoryTeam === 'red' ? '#ff4b2b' : '#00d2ff'}`,
+              boxShadow: `0 20px 80px ${victoryTeam === 'red' ? 'rgba(255,75,43,0.6)' : 'rgba(0,210,255,0.6)'}`,
+              minWidth: 480
+            }
+          }}
+        >
+          <Box sx={{ textAlign: 'center', pt: 5, pb: 2 }}>
+            <CelebrationIcon sx={{ fontSize: 80, color: victoryTeam === 'red' ? '#ff4b2b' : '#00d2ff', mb: 2 }} />
+            <Typography variant="h3" sx={{ 
+              fontWeight: 900, 
+              background: victoryTeam === 'red' 
+                ? 'linear-gradient(135deg, #ff4b2b 0%, #ff8c00 100%)'
+                : 'linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              {victoryTeam.toUpperCase()} WINS!
+            </Typography>
+          </Box>
+          <DialogContent sx={{ textAlign: 'center', pb: 4, px: 5 }}>
+            <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 600 }}>{victoryMessage}</Typography>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'center', pb: 4 }}>
+            <Button 
+              variant="contained" 
+              onClick={() => setVictoryDialog(false)}
+              sx={{ 
+                borderRadius: 3, 
+                px: 5, 
+                py: 1.5,
+                background: victoryTeam === 'red'
+                  ? 'linear-gradient(135deg, #ff4b2b 0%, #ff8c00 100%)'
+                  : 'linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%)',
+                fontWeight: 900,
+                fontSize: '1.1rem',
+                boxShadow: `0 8px 32px ${victoryTeam === 'red' ? 'rgba(255,75,43,0.5)' : 'rgba(0,210,255,0.5)'}`
+              }}
+            >
+              CLOSE
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbar */}
+        <Snackbar 
+          open={snackbar.open} 
+          autoHideDuration={3000} 
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert 
+            onClose={handleCloseSnackbar} 
+            severity={snackbar.severity} 
+            sx={{ 
+              borderRadius: 2,
+              backdropFilter: 'blur(20px)',
+              fontWeight: 700
+            }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Box>
-      <style>{`@keyframes blink { 50% { opacity: 0.2; } }`}</style>
     </ThemeProvider>
   );
 }
