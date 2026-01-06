@@ -2,6 +2,10 @@
 
 React-based control panel for managing ESP32 laser tag devices over UDP networking.
 
+For the server use [ESPNet Server](https://github.com/Daemonide/ESPNet-Server)
+
+For the client use [ESPNet Client](https://github.com/Daemonide/ESPNet-Client)
+
 ![Preview 1](espnet-frontend-preview1.png)
 ![Preview 2](espnet-frontend-preview2.png)
 ![Preview 3](espnet-frontend-preview3.png)
