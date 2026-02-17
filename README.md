@@ -1,97 +1,36 @@
-# ESPNet Server Frontend
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-React-based control panel for managing ESP32 laser tag devices over UDP networking.
+## Getting Started
 
-For the server use [ESPNet Server](https://github.com/Daemonide/ESPNet-Server)
-
-For the client use [ESPNet Client](https://github.com/Daemonide/ESPNet-Client)
-
-![Preview 1](espnet-frontend-preview1.png)
-![Preview 2](espnet-frontend-preview2.png)
-![Preview 3](espnet-frontend-preview3.png)
-![Preview 4](espnet-frontend-preview4.png)
-
-## What is this?
-
-Frontend dashboard for the ESPNet laser tag system. Connects to a Rust backend (running on port 8080) via WebSocket and provides real-time device management, game controls, and team-based laser tag gameplay.
-
-## Features
-
-- **Real-time device monitoring** - WebSocket connection shows live device status
-- **Device registry** - Assign NATO callsigns and team colors to ESP32 nodes
-- **Laser tag game mode** - Red vs Blue team gameplay with manual tagging
-- **Dashboard view** - Monitor all connected devices, restart them, or reset WiFi
-- **Responsive UI** - Dark theme with Material-UI components
-
-## Tech Stack
-
-- React
-- Material-UI (MUI)
-- WebSocket for real-time updates
-- REST API for device control
-
-## Setup
-
-### Prerequisites
-
-- Node.js and npm
-- ESPNet Rust server running on port 8080
-
-### Installation
-
-Clone the repo and install dependencies:
+First, run the development server:
 
 ```bash
-npm install
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-### Running
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-Start the development server:
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-```bash
-npm start
-```
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-The app will open at `http://localhost:3000/`
+## Learn More
 
-Make sure the Rust backend is running on `http://localhost:8080` before starting the frontend.
+To learn more about Next.js, take a look at the following resources:
 
-## Project Structure
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-```
-src/
-├── App.js           # Main app with routing and WebSocket
-├── Dashboard.jsx    # Device management view
-├── LaserTag.jsx     # Game controls and scoreboard
-└── index.js         # Entry point
-```
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Configuration
+## Deploy on Vercel
 
-If you need to change the backend server address, edit these lines in `App.js`:
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-```javascript
-const wsUrl = `ws://localhost:8080/ws`;  // WebSocket connection
-const response = await fetch(`http://localhost:8080${endpoint}`);  // API calls
-```
-
-## Features Breakdown
-
-### Device Registry
-- View all registered ESP32 devices (online and offline)
-- Assign NATO phonetic callsigns (Alpha, Bravo, Charlie, etc.)
-- Set team colors (Red/Blue)
-- Remove devices from registry
-
-### Dashboard
-- Real-time device status monitoring
-- Restart individual devices remotely
-- WiFi reset for reconfiguration
-- Connection uptime tracking
-
-### Laser Tag Mode
-- Team-based view (Red vs Blue)
-- Manual status toggle for each device
-- Victory when all opponents tagged
-- Reset game and tag states
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
